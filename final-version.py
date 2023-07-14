@@ -7,7 +7,7 @@ from os.path import isfile, join
 pygame.init()
 pygame.display.set_caption("Game Platform")
 WIDTH, HEIGHT = 1000, 800
-FPS = 60
+FPS = 100
 PLAYER_VEL = 5
 window = pygame.display.set_mode((WIDTH, HEIGHT))
 
@@ -17,7 +17,7 @@ def flip(sprites):
 
 
 def load_sprite_sheets(dir1, dir2, width, height, direction=False):
-    path = join("assets", dir1, dir2)
+    path = join("../assets", dir1, dir2)
     images = [f for f in listdir(path) if isfile(join(path, f))]
     all_sprites = {}
     for image in images:
@@ -37,7 +37,7 @@ def load_sprite_sheets(dir1, dir2, width, height, direction=False):
 
 
 def get_block(size, x, y):
-    path = join("assets", "Terrain", "Terrain.png")
+    path = join("../assets", "Terrain", "Terrain.png")
     image = pygame.image.load(path).convert_alpha()
     surface = pygame.Surface((size,size), pygame.SRCALPHA, 32)
     rect = pygame.Rect(x, y, size, size)
@@ -46,9 +46,8 @@ def get_block(size, x, y):
 
 
 class Player(pygame.sprite.Sprite):
-    COLOR = (255, 0, 0)
     GRAVITY = 1
-    SPRITES = load_sprite_sheets("MainCharacters", "VirtualGuy", 32, 32, True)
+    SPRITES = load_sprite_sheets("MainCharacters", "MaskDude", 32, 32, True)
     ANIMATION_DELAY = 3
 
     def __init__(self, x, y, width, height):
@@ -203,12 +202,43 @@ class Spikes(Object):
         self.mask = pygame.mask.from_surface(self.image)
 
 
+class Fan(Object):
+    ANIMATION_DELAY = 3
+    def __init__(self, x, y, width, height):
+        super().__init__(x, y, width, height, "fan")
+        self.fan = load_sprite_sheets('Traps', "Fan", width, height)
+        self.image = self.fan['off'][0]
+        self.mask = pygame.mask.from_surface(self.image)
+        self.animation_count = 0
+        self.animation_name = 'off'
+
+    def on(self):
+        self.animation_name = 'on'
+
+    def off(self):
+        self.animation_name = "off"
+
+    def loop(self):
+        sprites = self.fan[self.animation_name]
+        sprite_index = (self.animation_count // self.ANIMATION_DELAY) % len(sprites)
+        self.image = sprites[sprite_index]
+        self.animation_count += 1
+        self.rect = self.image.get_rect(topleft=(self.rect.x, self.rect.y))
+        self.mask = pygame.mask.from_surface(self.image)
+
+        if self.animation_count // self.ANIMATION_DELAY > len(sprites):
+            self.animation_count = 0
+
+
+
+
+
 
 
 
 
 def get_background(name):
-    image = pygame.image.load(join("assets", "Background", name)).convert_alpha()
+    image = pygame.image.load(join("../assets", "Background", name)).convert_alpha()
     _, _, width, height = image.get_rect()
     tiles = []
     for i in range(WIDTH // width + 1):
@@ -222,7 +252,7 @@ def draw(window, background, bg_image, player, objects, offset_x):
     for tile in background:
         window.blit(bg_image, tile)
     for obj in objects:
-        obj.draw(window,offset_x)
+        obj.draw(window, offset_x)
     player.draw(window, offset_x)
     pygame.display.update()
 
@@ -273,7 +303,7 @@ def handle_move(player, objects):
 
 def main(window):
     clock = pygame.time.Clock()
-    background, bg_image = get_background('Purple.png')
+    background, bg_image = get_background('Blue.png')
     block_size = 96
 
     player = Player(100, 100, 50, 50)
@@ -303,13 +333,36 @@ def main(window):
     blocks.append(Block(block_size * 33, HEIGHT - block_size * 5, block_size, 96, 0))
     blocks.append(Block(block_size * 35, HEIGHT - block_size * 7, block_size, 96, 0))
     blocks.append(Block(block_size * 39, HEIGHT - block_size * 3, block_size, 96, 0))
-
-
-
+    blocks.append(Block(block_size * 50, HEIGHT - block_size * 3, block_size, 192, 0))
+    blocks.append(Block(block_size * 51, HEIGHT - block_size * 4, block_size, 192, 0))
+    blocks.append(Block(block_size * 51, HEIGHT - block_size * 5, block_size, 192, 0))
+    blocks.append(Block(block_size * 52, HEIGHT - block_size * 6, block_size, 192, 0))
+    blocks.append(Block(block_size * 52, HEIGHT - block_size * 7, block_size, 192, 0))
+    blocks.append(Block(block_size * 53, HEIGHT - block_size * 8, block_size, 192, 0))
+    for i in range(70, 80):
+        block = Block(80 * i, HEIGHT - block_size * 3, 85, 288, 0)
+        blocks.append(block)
     spikes = []
+
     for i in range(2000, 4000, 28):
         spike = Spikes(i, HEIGHT - block_size - 32, 16, 32)
         spikes.append(spike)
+    for i in range(block_size * 53, block_size * 59, 28):
+        spike = Spikes(i, HEIGHT - block_size - 32, 16, 32)
+        spikes.append(spike)
+
+
+
+
+    fans =[]
+    for i in range(2200, 3000, 50):
+        fan = Fan(i, HEIGHT - block_size * 5, 24, 20)
+        fan.on()
+        fans.append(fan)
+
+
+
+
 
 
     first_floor = [Block(i * block_size, HEIGHT - block_size, block_size, 0, 0) for i in range(-WIDTH // block_size, (WIDTH * 2) // block_size)]
@@ -321,13 +374,13 @@ def main(window):
                Block(0, HEIGHT - block_size * 2, block_size, 0, 0),
                *blocks,
                *fires,
-               *spikes
+               *spikes,
+               *fans,
                ]
     offset_x = 0
-    scroll_area_width = 200
+    scroll_area_width = 400
     run = True
     while run:
-        # to standardize the frames in any os
         clock.tick(FPS)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -337,8 +390,14 @@ def main(window):
                 if event.key == pygame.K_SPACE and player.jump_count < 2:
                     player.jump()
         player.loop(FPS)
+
+
+
         for fire in fires:
             fire.loop()
+
+        for fan in fans:
+            fan.loop()
         handle_move(player,objects)
         draw(window, background, bg_image, player, objects, offset_x)
         if((player.rect.right - offset_x >= WIDTH - scroll_area_width) and player.x_vel > 0) or ((player.rect.left - offset_x <= scroll_area_width) and player.x_vel < 0):
